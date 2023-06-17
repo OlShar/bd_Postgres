@@ -1,0 +1,447 @@
+Создание таблицы:
+
+create table "Shop".orders
+(
+    id        serial primary key,
+    client_id integer      not null references "Shop".clients (id),
+    date      date         not null,
+    status    varchar(100) not null check ( status in ('done', 'in progress', 'delivery') ),
+    address   varchar(100) not null
+);
+***********************************************************************************************************
+
+Список созданных таблиц:
+
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+  AND table_schema IN ('public', 'Shop');
+
+или
+
+SELECT *
+FROM information_schema.tables
+WHERE table_schema = 'Shop';
+************************************************************************************************************
+
+Удаление базы данных / таблицы:
+
+Drop database web_shop;
+
+Drop table "Shop".orders;
+***********************************************************************************************************
+
+Содержание таблицы:
+
+select *
+from "Shop".orders;
+**********************************************************************************************************
+
+Структура таблицы:
+
+SELECT *
+FROM information_schema.columns
+WHERE table_schema = 'Shop'
+  AND table_name = 'orders';
+
+или
+
+SELECT column_name, column_default, data_type
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE table_name = 'orders';
+*********************************************************************************************************
+
+Создние таблицы с внешним ключом:
+
+CREATE TABLE "Shop".positions (
+  id SERIAL,
+  order_id integer NOT NULL,
+  product_id integer NOT NULL,
+  amount integer NOT NULL,
+  CONSTRAINT positions_pk PRIMARY KEY (id),
+  CONSTRAINT order_fk FOREIGN KEY(order_id) REFERENCES "Shop".orders(id),
+  CONSTRAINT product_fk FOREIGN KEY(product_id) REFERENCES "Shop".products(id)
+);
+***********************************************************************************************************
+
+Заполнение таблицы:
+
+INSERT INTO "Shop".clients(name, phone, email)
+VALUES ('Иванов Иван Иванович', '89992332244', 'ivanov.ivan@mail.ru');
+************************************************************************************************************
+
+Временное переименование:
+
+SELECT name     AS "Название товара",
+       price    AS "Цена",
+       category AS "Категория",
+       in_stock AS "В наличии"
+FROM "Shop".products;
+------------------------------------------------------
+SELECT name             AS "Название товара",
+       in_stock * price AS "Cумма товара наличии"
+from "Shop".products;
+**********************************************************************************************************
+
+Условия:
+
+SELECT name
+FROM "Shop".products
+WHERE 'товары для дома' = category;
+------------------------------------------------------
+SELECT *
+FROM "Shop".orders
+WHERE address = 'Казань'
+  AND status != 'done'
+  AND status != 'delivery';
+----------------------------------------------------------
+SELECT *
+FROM "Shop".orders
+WHERE status NOT IN ('done')
+  AND address IN (
+                  'Казань', 'Мурманск',
+                  'Новосибирск'
+    );
+********************************************************************************************
+
+Запрос в подзапросе:
+
+SELECT name
+FROM "Shop".clients
+WHERE id IN (SELECT client_id
+             FROM "Shop".orders
+             WHERE address = 'Мурманск');
+------------------------------------------------------
+SELECT name
+FROM "Shop".clients
+WHERE id NOT IN (SELECT client_id
+                 FROM "Shop".orders);
+****************************************************************************************************
+
+Даты:
+
+SELECT  current_date;
+------------------------------------------
+SELECT  current_time;
+--------------------------------------------
+SELECT extract('mon' FROM date '1999-11-27');
+--------------------------------------------
+SELECT extract('day' FROM current_date);
+**************************************************************************************************
+
+Сложение даты, числа, интервала:
+
+SELECT date                     AS "Old date",
+       date + 7                 AS "New date",
+       date + INTERVAL '7 hour' AS "New date with time"
+from "Shop".orders;
+******************************************************************************************************
+
+Вычитание дат:
+
+SELECT max(date) - min(date) AS "Difference"
+FROM "Shop".orders;
+********************************************************************************************************
+
+количество дней между самым новым заказом и текущей датой.
+
+SELECT current_date - (SELECT max(date) FROM "Shop".orders);
+*************************************************************************************************************
+
+месяц, в котором был сделан самый последний заказ:
+
+SELECT extract(month FROM (SELECT max(date) FROM "Shop".orders));
+****************************************************************************************************************
+
+Сколько заказов были сделаны после 12 марта 2020?
+
+SELECT *
+FROM "Shop".orders
+WHERE date > '2020-03-12';
+****************************************************************************************************************
+
+запрос, который будет возвращать номера клиентов, у которых чётный id в верхнем регистре.
+
+SELECT id, upper(name)
+FROM "Shop".clients
+WHERE id % 2 = 0;
+***************************************************************************************************************
+
+SELECT 'Номер телефона ' || (name) || ': ' || (phone) AS "Информация о клиенте"
+FROM "Shop".clients;
+
+Результат:
+Номер телефона Давыдова  Екатерина Викторовна: 88753334444
+*******************************************************************************************************************
+
+SELECT 'Номер телефона ' || (name) || ': ' ||
+       (substring(phone from 1 for 4) || '***' || substring(phone from 8 for 4)) AS "Информация о клиенте"
+FROM "Shop".clients;
+
+или
+
+SELECT 'Номер телефона ' || name || ': ' ||
+       overlay(phone placing 'xxx' from 5 for 3) AS "Информация о клиенте"
+FROM "Shop".clients;
+
+Результат:
+Номер телефона Давыдова  Екатерина Викторовна: 8875***4444
+*******************************************************************************************************************
+
+Какие id у заказов, города доставки которых заканчиваются на "ск"?
+
+SELECT *
+FROM "Shop".orders
+WHERE address LIKE '%ск';
+*******************************************************************************************************************
+
+запрос, который возвращает имена клиентов в номерах телефонов, в которых после 6 следует 7 или наоборот.
+
+SELECT name
+FROM "Shop".clients
+WHERE phone SIMILAR TO '%(67|76)%';
+*********************************************************************************************************************
+
+В скольких номерах телефонов есть три или более цифры 4 подряд?
+
+SELECT phone
+FROM "Shop".clients
+WHERE phone SIMILAR TO '%4{3,}%';
+**********************************************************************************************************************
+
+запрос, который возвращает название товаров, категория которых не определена.
+
+SELECT *
+FROM "Shop".products
+WHERE category IS NULL;
+**********************************************************************************************************************
+
+выбрать из таблицы только уникальные данные
+
+SELECT DISTINCT category
+FROM "Shop".products;
+----------------------------------
+SELECT DISTINCT category
+FROM "Shop".products
+WHERE category IS NOT NULL;
+***************************************************************************************************************
+
+Сотировка:
+
+SELECT name
+FROM "Shop".products
+WHERE category = 'товары для дома'
+ORDER BY price;
+**************************************************************************************************
+
+Какое имя у самого дорогого товара:
+
+SELECT name
+FROM "Shop".products
+WHERE price = (SELECT max(price) FROM "Shop".products);
+*********************************************************************************************
+
+запрос, который подсчитывает среднюю стоимость товара в категории:
+
+SELECT category,
+       avg(price) AS avg_price
+FROM "Shop".products
+WHERE category IS NOT NULL
+GROUP BY category
+ORDER BY avg_price;
+**************************************************************************************************
+
+запрос, который возвращает количество видов товара в каждом заказе:
+
+SELECT order_id,
+       count(*) AS coun
+FROM "Shop".positions
+GROUP BY order_id
+ORDER BY coun;
+*****************************************************************************************************
+
+запрос, который возвращает информацию о том,
+сколько заказов выполнено, сколько заказов в доставке и в процессе обработки.
+В подсчёте не должны участвовать товары, у которых город доставки – Казань:
+
+SELECT status, count(*)
+FROM "Shop".orders
+WHERE address NOT IN ('Казань')
+GROUP BY status
+ORDER BY count(*);
+***************************************************************************************************
+
+запрос, который возвращает названия всех товаров, которые были в самом последнем (по дате) заказе.
+
+SELECT name
+FROM "Shop".products
+WHERE id IN (SELECT product_id
+             FROM "Shop".positions
+             WHERE order_id = (SELECT orders.id
+                               FROM "Shop".orders
+                               WHERE date = (SELECT max(date)
+                                             FROM "Shop".orders)));
+*******************************************************************************************************************
+
+запрос, который выводит имена клиентов, сортируя их в порядке убывания по длине имени.
+
+SELECT name
+FROM "Shop".clients
+ORDER BY length(name);
+**************************************************************************************************************
+
+INNER JOIN
+
+SELECT *
+FROM "Shop".orders
+         JOIN "Shop".clients ON orders.client_id = clients.id;
+***************************************************************************************************************
+
+CROSS JOIN
+
+SELECT *
+FROM "Shop".orders
+         CROSS JOIN "Shop".clients;
+*****************************************************************************************************************
+
+FULL OUTER JOIN
+
+SELECT *
+FROM "Shop".orders
+         FULL OUTER JOIN "Shop".clients ON orders.client_id = clients.id;
+*******************************************************************************************************************
+
+LEFT OUTER JOIN
+
+SELECT *
+FROM "Shop".orders
+         LEFT OUTER JOIN "Shop".clients ON orders.client_id = clients.id;
+
+SELECT *
+FROM "Shop".clients
+         LEFT OUTER JOIN "Shop".orders ON orders.client_id = clients.id;
+*******************************************************************************************************************
+
+EXCLUSIVE JOIN
+
+SELECT *
+FROM "Shop".clients
+         RIGHT OUTER JOIN "Shop".orders ON orders.client_id = clients.id
+WHERE "Shop".clients.id IS NULL;
+
+SELECT *
+FROM "Shop".clients
+         LEFT OUTER JOIN "Shop".orders ON orders.client_id = clients.id
+WHERE "Shop".orders.id IS NULL;
+
+SELECT *
+FROM "Shop".clients
+         FULL JOIN "Shop".orders ON orders.client_id = clients.id
+WHERE "Shop".orders.id IS NULL
+   OR "Shop".clients.id IS NULL;
+********************************************************************************************************************
+
+ суммарное количество и имя для каждого товара, который приобрёл клиент с идентификатором 5
+
+SELECT sum(pos.amount),
+       prod.name
+FROM "Shop".positions AS pos
+         JOIN "Shop".orders AS o ON pos.order_id = o.id
+         JOIN "Shop".products AS prod ON prod.id = pos.product_id
+WHERE o.client_id = 5
+GROUP BY prod.id;
+
+SELECT sum("Shop".positions.amount),
+       "Shop".products.name
+FROM "Shop".positions
+JOIN "Shop".orders ON positions.order_id = orders.id
+JOIN "Shop".products ON positions.product_id = products.id
+WHERE "Shop".orders.client_id = 5
+GROUP BY products.id;
+
+SELECT sum("Shop".positions.amount),
+       "Shop".products.name, "Shop".products.id
+FROM "Shop".positions
+JOIN "Shop".orders ON positions.order_id = orders.id
+JOIN "Shop".products ON positions.product_id = products.id
+WHERE "Shop".orders.client_id = 5
+GROUP BY products.name, products.id
+ORDER BY sum("Shop".positions.amount);
+********************************************************************************************************************
+
+запрос, который возвращает названия всех товаров, которые были в самом последнем (по дате) заказе.
+
+SELECT name
+FROM "Shop".products
+WHERE id IN (SELECT product_id
+             FROM "Shop".positions
+             WHERE order_id = (SELECT orders.id
+                               FROM "Shop".orders
+                               WHERE date = (SELECT max(date)
+                                             FROM "Shop".orders)));
+
+SELECT products.name
+FROM "Shop".orders
+         JOIN "Shop".positions ON orders.id = positions.order_id
+         JOIN "Shop".products ON positions.product_id = products.id
+WHERE date = (SELECT max(date)
+                     FROM "Shop".orders);
+********************************************************************************************************************
+
+запрос, который возвращает идентификатор клиента, имя клиента и суммарное количество его заказов.
+Обязательное условие: если клиент не сделал ни одного заказа, то значение суммарного количества заказов должно быть 0.
+Отсортируйте результат по возрастанию .
+
+SELECT "Shop".clients.id, "Shop".clients.name, count("Shop".orders.id)
+FROM "Shop".clients
+          LEFT JOIN "Shop".orders ON orders.client_id = clients.id
+GROUP BY "Shop".clients.id
+ORDER BY "Shop".clients.id;
+****************************************************************************************************************
+
+запрос возвращает суммарную стоимость заказов
+
+SELECT "Shop".orders.id,
+       sum("Shop".positions.amount * "Shop".products.price)
+FROM "Shop".orders
+         JOIN "Shop".positions on orders.id = "Shop".positions.order_id
+         JOIN "Shop".products on positions.product_id = "Shop".products.id
+GROUP BY orders.id;
+************************************************************************************************************
+
+Объединение двух множеств — UNION
+
+SELECT *
+FROM "Shop".orders
+WHERE status = 'done'
+UNION
+SELECT *
+FROM "Shop".orders
+WHERE status = 'delivery';
+**************************************************************************************************************
+
+исключение — EXCEPT
+
+SELECT *
+FROM "Shop".orders
+EXCEPT
+SELECT *
+FROM "Shop".orders
+WHERE status = 'in progress';
+***************************************************************************************************************
+
+нужно получить номера телефонов и номера заказов для клиентов, которые заказывали товар с идентификатором 1
+и тех, кто указал в адресе доставки Казань.
+
+SELECT "Shop".clients.phone,
+       tmp.order_id
+FROM "Shop".clients
+         JOIN (SELECT "Shop".orders.id AS order_id, client_id
+               FROM "Shop".orders
+                        JOIN "Shop".positions ON positions.order_id = orders.id
+               WHERE positions.product_id = 1
+               UNION
+               SELECT "Shop".orders.id, client_id
+               FROM "Shop".orders
+               WHERE address = 'Казань') AS tmp ON tmp.client_id = clients.id;
+********************************************************************************************************************
